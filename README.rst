@@ -142,7 +142,7 @@ Authentication using OAuth authentication is bit more complicated, as it involve
     >>> from smartfile import OAuthClient
     >>> api = OAuthClient('**********', '**********')
     >>> # Be sure to only call each method once for each OAuth login
-    >>> 
+    >>>
     >>> # This is the first step with the client, which should be left alone
     >>> api.get_request_token()
     >>> # Redirect users to the following URL:
@@ -199,18 +199,15 @@ File transfers
 
 Uploading and downloading files is supported.
 
-To upload a file, pass either a file-like object or a tuple of
-``(filename, file-like)`` as a kwarg.
+To upload a file:
 
 .. code:: python
 
-    >>> from StringIO import StringIO
-    >>> data = StringIO('StringIO instance has no .name attribute!')
     >>> from smartfile import BasicClient
     >>> api = BasicClient()
-    >>> api.post('/path/data/', file=('foobar.png', data))
-    >>> # Or use a file-like object with a name attribute
-    >>> api.post('/path/data/', file=file('foobar.png', 'rb'))
+    >>> file = open('test.txt', 'rb')
+    >>> api.upload('test.txt', file)
+
 
 Downloading is automatic, if the ``'Content-Type'`` header indicates
 content other than the expected JSON return value, then a file-like object is
@@ -218,12 +215,10 @@ returned.
 
 .. code:: python
 
-    >>> import shutil
     >>> from smartfile import BasicClient
     >>> api = BasicClient()
-    >>> f = api.get('/path/data/', 'foobar.png')
-    >>> with file('foobar.png', 'wb') as o:
-    >>>     shutil.copyfileobj(f, o)
+    >>> api.download('foobar.png')
+
 
 Tasks
 -----
@@ -232,82 +227,53 @@ Operations are long-running jobs that are not executed within the time frame
 of an API call. For such operations, a task is created, and the API can be used
 to poll the status of the task.
 
+Move files
+
+.. code:: python
+
+    >>> import logging
+    >>> from smartfile import BasicClient
+    >>>
+    >>> api = BasicClient()
+    >>>
+    >>> LOGGER = logging.getLogger(__name__)
+    >>> LOGGER.setLevel(logging.INFO)
+    >>>
+    >>> api.move('file.txt', '/newFolder')
+    >>>
+    >>> while True:
+    >>>     try:
+    >>>         s = api.get('/task', api['uuid'])
+    >>>         # Sleep to assure the user does not get rate limited
+    >>>         time.sleep(1)
+    >>>         if s['result']['status'] == 'SUCCESS':
+    >>>             break
+    >>>         elif s['result']['status'] == 'FAILURE':
+    >>>             LOGGER.info("Task failure: " + s['uuid'])
+    >>>     except Exception as e:
+    >>>         print e
+    >>>         break
+
+
+Delete files
+
 .. code:: python
 
     >>> from smartfile import BasicClient
     >>> api = BasicClient()
-    >>> t = api.post('/path/oper/move/', src='/foobar.png', dst='/images/foobar.png')
-    >>> while True:
-    >>>     s = api.get('/task', t['uuid'])
-    >>>     if s['status'] == 'SUCCESS':
-    >>>         break
-
-Synchronization
----------------
-
-If you have many files that you wish to keep synchronized between a number of
-computer systems and SmartFile, the sync API can help. The sync API is an
-implementation of the excellent and popular rsync delta algorithm. It is
-completely compatible with the file formats used in librsync version 0.9.7.
-
-The `Rsync algorithm`_ provides a means to synchronize two files by transferring
-just the parts that differ, while retaining the parts that are the same. This
-allows files to be quickly and efficiently synchronized. The rsync algorithm
-is very popular and widely deployed. The implementation in librsync is very
-high quality Open Source software.
-
-SmartFile maintains a `Python wrapper for libarchive`_. The difference between this
-and other wrappers is that the SmartFile wrapper is written using ctypes. Also
-This wrapper is standalone, is specifically written to work with non-disk files
-and has a full test suite.
-
-If you wish to call the synchronization API using the language of your choice,
-you will need to first gain access to librsync. For example, calling librsync
-from Java would require using JNI.
-
-Once you have librsync available, synchronizing files using the SmartFile sync
-API is very simple. The API exposes three calls, corresponding to the three
-steps of the algorithm.
-
-1. Signature (destination)
-2. Delta (source)
-3. Patch (destination)
-
-Depending on the direction of synchronization, source and destination may be
-either your local machine or the SmartFile API. In either case, the steps are
-performed in the same order.
-
-The SmartFile API client provides a simple ``SyncClient`` class that
-demonstrates synchronizing files in either direction. An example of it's usage
-follows.
-
-.. code:: python
-
-    >>> # The sync API uses the same calling conventions as the REST of the API
-    >>> # (pun intended), therefore, we utilize either the Basic or OAuth
-    >>> # flavor of the API client.
-    >>> 
-    >>> from smartfile import BasicClient
-    >>> from smartfile.sync import SyncClient
-    >>> 
-    >>> sync = SyncClient(BasicClient())
-    >>> 
-    >>> # Synchronize TO the server
-    >>> sync.upload('/home/btimby/docs/Resume.pdf', '/docs/Resume.pdf')
-    >>> 
-    >>> # Synchronize FROM the server
-    >>> sync.download('/home/btimby/photos/bricks.jpg', '/photos/bricks.jpg')
-
-The ``SyncClient`` class utilizes libarchive to interact with local files. It uses
-the API client to interact with remote files.
-
-The ``SyncClient`` is not a full synchronization solution, it is only concerned
-with file transfer utilizing deltas. To perform bidirection synchronization (merge
-replication) you would also need to maintain a database of file attributes in
-order to determine if local and remote files are out of sync, which one is
-newest, whether or not the copies conflict and a host of other conditions.
+    >>> api.remove('foobar.png')
 
 .. _SmartFile: http://www.smartfile.com/
 .. _Read more: http://www.smartfile.com/open-source.html
-.. _Rsync algorithm: http://en.wikipedia.org/wiki/Rsync#Algorithm
-.. _Python wrapper for libarchive: https://www.github.com/smartfile/python-librsync/
+
+
+
+Running Tests
+--------------
+To run tests for the test.py file:
+::
+    nosetests -v tests.py
+
+To run tests for the test_smartfile.py file:
+::
+    API_KEY='****' API_PASSWORD='****' nosetests test

@@ -2,7 +2,6 @@
 
 import os
 import re
-#from distutils.core import setup
 from setuptools import setup
 
 VERSION_PATTERN = re.compile(r'^[^#]*__version__\W*\=\W*["\'](.*)["\']')
@@ -42,9 +41,9 @@ setup(
         'requests_oauthlib',
     ],
     author='SmartFile',
-    author_email='info@smartfile.com',
+    author_email='tech@smartfile.com',
     maintainer='Ben Timby',
-    maintainer_email='btimby@gmail.com',
+    maintainer_email='tech@smartfile.com',
     url='http://github.com/smartfile/client-python/',
     license='MIT',
     packages=['smartfile'],

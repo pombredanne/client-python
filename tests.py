@@ -1,22 +1,13 @@
-import os
-import six
 import cgi
 import json
-import zlib
-import random
-import base64
-import hashlib
+import os
+import tempfile
+import threading
+import unittest
 try:
     import urlparse
 except ImportError:
     import urllib.parse as urlparse
-import unittest
-import tempfile
-import threading
-
-from collections import deque
-
-from six import StringIO
 
 try:
     from BaseHTTPServer import HTTPServer
@@ -27,7 +18,6 @@ except ImportError:
 
 from smartfile import BasicClient
 from smartfile import OAuthClient
-from smartfile.sync import SyncClient
 from smartfile.errors import APIError
 from smartfile.errors import RequestError
 
@@ -38,16 +28,6 @@ CLIENT_TOKEN = '8oWot4KrppJDzfokDsHNJrND0Ay13s'
 CLIENT_SECRET = '0I7BV6Bm3Rgfk73LL68vBp0u23KcKr'
 ACCESS_TOKEN = 'hIlkipZNmwIJ28HQtQRcbGuXBePQp5'
 ACCESS_SECRET = 'Scen1dwmVtWhjLpJfnilrfdc5OZWCJ'
-
-SYNC_FILE_A = six.b("""This is a test file.
-It will be used with the sync client.""")
-SYNC_FILE_B = six.b("""It will be used with the sync client.
-This is a test file.""")
-
-# b64encode(librsync.signature(SYNC_FILE_A)):
-SYNC_SIGNATURE = base64.b64decode(six.b('cnMBNgAACAAAAAAIFvwbJw0ItorhbKRo'))
-# b64encode(librsync.delta(SYNC_FILE_B, signature)):
-SYNC_DELTA = base64.b64decode(six.b('cnMCNkE6SXQgd2lsbCBiZSB1c2VkIHdpdGggdGhlIHN5bmMgY2xpZW50LgpUaGlzIGlzIGEgdGVzdCBmaWxlLgA='))
 
 
 class TestHTTPRequestHandler(BaseHTTPRequestHandler):
@@ -67,9 +47,15 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
         BaseHTTPRequestHandler.__init__(self, *args, **kwargs)
 
     def record(self, method, path, query=None, data=None):
-        request = TestHTTPRequestHandler.TestRequest(method, path, query=query,
-                                                     data=data,
-                                                     headers=dict(self.headers.items()))
+        request = TestHTTPRequestHandler.TestRequest(
+            method,
+            path,
+            query=query,
+            data=data,
+            headers=dict(
+                self.headers.items()
+            )
+        )
         self.server.requests.append(request)
         return request
 
@@ -77,7 +63,7 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-type", "text/plain")
         self.end_headers()
-        self.wfile.write(six.b("Hello World!"))
+        self.wfile.write(b"Hello World!")
 
     def parse_and_record(self, method):
         urlp = urlparse.urlparse(self.path)
@@ -86,7 +72,8 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
             l = int(self.headers['Content-Length'])
             ct, params = cgi.parse_header(self.headers['Content-Type'])
             if ct == 'multipart/form-data':
-                data = cgi.FieldStorage(fp=self.rfile, headers=self.headers, environ={'REQUEST_METHOD': 'POST'})
+                data = cgi.FieldStorage(fp=self.rfile, headers=self.headers,
+                                        environ={'REQUEST_METHOD': 'POST'})
             else:
                 data = urlparse.parse_qs(self.rfile.read(l))
         request = self.record(method, urlp.path, query=query, data=data)
@@ -170,7 +157,7 @@ class TestServerTestCase(unittest.TestCase):
 
     def assertIn(self, test_value, expected_set):
         msg = "%s did not occur in %s" % (test_value, expected_set)
-        self.assert_(test_value in expected_set, msg) 
+        self.assert_(test_value in expected_set, msg)
 
 
 class ClientTestCase(TestServerTestCase):
@@ -228,7 +215,8 @@ class MethodTestCase(object):
         self.assertMethod('GET')
 
     def test_post_is_POST(self):
-        self.client.post('/user', username='bobafett', email='bobafett@example.com')
+        self.client.post('/user', username='bobafett',
+                         email='bobafett@example.com')
         self.assertMethod('POST')
 
     def test_get_is_GET(self):
@@ -248,7 +236,7 @@ class DownloadTestCase(object):
     def test_file_response(self):
         r = self.client.get('/user')
         self.assertTrue(hasattr(r, 'read'), 'File-like object not returned.')
-        self.assertEqual(r.read(), six.b('Hello World!'))
+        self.assertEqual(r.read(), b'Hello World!')
 
 
 class UploadTestCase(object):
@@ -315,8 +303,8 @@ class BasicClientTestCase(DownloadTestCase, UploadTestCase, MethodTestCase,
                     address, port = address
                 else:
                     port = self.server.server_port
-                netrc = six.b("machine 127.0.0.1:%s\n  login %s\n  password %s" % (
-                        port, API_KEY, API_PASSWORD))
+                netrc = b"machine 127.0.0.1:%s\n  login %s\n  password %s" % (
+                        port, API_KEY, API_PASSWORD)
                 os.write(fd, netrc)
             finally:
                 os.close(fd)
@@ -334,7 +322,8 @@ class BasicClientTestCase(DownloadTestCase, UploadTestCase, MethodTestCase,
 class OAuthClientTestCase(DownloadTestCase, UploadTestCase, MethodTestCase,
                           UrlGenerationTestCase, OAuthTestCase):
     def test_blank_client_token(self):
-        self.assertRaises(APIError, self.getClient, client_token='', client_secret='')
+        self.assertRaises(APIError, self.getClient,
+                          client_token='', client_secret='')
 
     def test_blank_access_token(self):
         client = self.getClient(access_token='', access_secret='')
@@ -346,7 +335,7 @@ class HTTPThrottleRequestHandler(TestHTTPRequestHandler):
         self.send_response(503)
         self.send_header("X-Throttle", "throttled; next=0.01 sec")
         self.end_headers()
-        self.wfile.write(six.b("Request Throttled!"))
+        self.wfile.write(b"Request Throttled!")
 
 
 class ThrottleTestCase(object):
@@ -370,7 +359,7 @@ class HTTPJSONRequestHandler(TestHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
-        self.wfile.write(six.b(json.dumps({ 'foo': 'bar' })))
+        self.wfile.write(b"%s" % (json.dumps({'foo': 'bar'}), ))
 
 
 class JSONTestCase(object):
@@ -379,7 +368,7 @@ class JSONTestCase(object):
     def test_throttle_GET(self):
         r = self.client.get('/user')
         self.assertMethod('GET')
-        self.assertEqual(r, { 'foo': 'bar' })
+        self.assertEqual(r, {'foo': 'bar'})
 
 
 class BasicJSONTestCase(JSONTestCase, BasicTestCase):
@@ -387,83 +376,6 @@ class BasicJSONTestCase(JSONTestCase, BasicTestCase):
 
 
 class OAuthJSONTestCase(JSONTestCase, OAuthTestCase):
-    pass
-
-
-class SyncRequestHandler(TestHTTPRequestHandler):
-    def respond(self, request):
-        if '/signature/' in request.path:
-            return self.respond_signature()
-        elif '/delta/' in request.path:
-            return self.respond_delta()
-        elif '/patch/' in request.path:
-            return self.respond_patch()
-        else:
-            return super(SyncRequestHandler, self).respond()
-
-    def respond_signature(self):
-        self.send_response(200)
-        self.send_header("Content-Type", "application/librsync-signature")
-        self.end_headers()
-        self.wfile.write(SYNC_SIGNATURE)
-
-    def respond_delta(self):
-        self.send_response(200)
-        self.send_header("Content-Type", "application/librsync-delta")
-        self.end_headers()
-        self.wfile.write(SYNC_DELTA)
-
-    def respond_patch(self):
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.end_headers()
-        self.wfile.write(six.b(json.dumps({'foo': 'bar'})))
-
-
-class SyncTestCase(object):
-    "Test delta transfer via sync API."
-    handler = SyncRequestHandler
-
-    def getClient(self, **kwargs):
-        "Override to return a sync client that uses the underlying client."
-        client = super(SyncTestCase, self).getClient(**kwargs)
-        return SyncClient(client)
-
-    def test_upload(self):
-        "Ensure we can upload via sync API."
-        fd, t = tempfile.mkstemp()
-        os.write(fd, SYNC_FILE_B)
-        os.close(fd)
-        try:
-            self.client.upload(t, '/unittest/sync')
-        finally:
-            os.unlink(t)
-        self.assertRequestCount(2)
-        self.assertPath('/api/%s/path/sync/signature/unittest/sync/' % self.client.version, request=0)
-        self.assertPath('/api/%s/path/sync/patch/unittest/sync/' % self.client.version, request=1)
-        self.assertData('delta', SYNC_DELTA, request=1)
-
-    def test_download(self):
-        "Ensure we can download via sync API."
-        fd, t = tempfile.mkstemp()
-        os.write(fd, SYNC_FILE_A)
-        os.close(fd)
-        try:
-            self.client.download(t, '/unittest/sync')
-            # The local file contents should have been changed.
-            self.assertEqual(SYNC_FILE_B, open(t, 'rb').read())
-        finally:
-            os.unlink(t)
-        self.assertRequestCount(1)
-        self.assertPath('/api/%s/path/sync/delta/unittest/sync/' % self.client.version)
-        self.assertData('signature', SYNC_SIGNATURE)
-
-
-class BasicSyncTestCase(SyncTestCase, BasicTestCase):
-    pass
-
-
-class OAuthSyncTestCase(SyncTestCase, OAuthTestCase):
     pass
 
 
